@@ -1,44 +1,32 @@
 module StratF.BigStep where
 
-open import Data.List using (List; []; _∷_; [_])
-open import Data.Nat using (ℕ; suc)
-open import Data.Product using (_×_; Σ; Σ-syntax; ∃-syntax; _,_; proj₁; proj₂)
+open import Data.Nat.Base using (suc)
 
-open import StratF.ExprSubstitution
+open import StratF.ExpSubstitution
 open import StratF.Expressions
-open import StratF.Types
+open import StratF.TypeEnvironments
 open import StratF.Evaluation
 
 --! BigStep >
 
 -- big step semantics
 infix 15 _⇓_
---! Semantics
-data _⇓_ : CExpr T → CValue T → Set where
-  ⇓-n  :  # n ⇓ (# n , V-♯)
-  ⇓-s  :  e ⇓ (# n , V-♯) → `suc e ⇓ (# suc n , V-♯)
-  ⇓-ƛ  :  ƛ e ⇓ (ƛ e , V-ƛ)
-  ⇓-·  :  e₁ ⇓ (ƛ e , V-ƛ) → e₂ ⇓ v₂ → (e [ exp v₂ ]E) ⇓ v →
-          (e₁ · e₂) ⇓ v
-  ⇓-Λ  :  Λ l ⇒ e ⇓ (Λ l ⇒ e , V-Λ)
-  ⇓-∙  :  e₁ ⇓ (Λ l ⇒ e , V-Λ) → (e [ T ]ET) ⇓ v → (e₁ ∙ T) ⇓ v
 
---! ValueReduceSelf
-Value-⇓ : ∀ {l} {T : Type [] l} → (v : CValue T) → exp v ⇓ v
-Value-⇓ (.(# _) ,      V-♯)  = ⇓-n
-Value-⇓ (.(ƛ _) ,      V-ƛ)  = ⇓-ƛ
-Value-⇓ (.(Λ _ ⇒ _) ,  V-Λ)  = ⇓-Λ
+--! Semantics
+data _⇓_ : Exp₀ T₀ → Val₀ T₀ → Set where
+  ⇓-v :  ‵val v₀ ⇓ v₀
+  ⇓-s :  e₀ ⇓ # n → ‵suc e₀ ⇓ # suc n
+  ⇓-· :  f₀ ⇓ ƛ e → e₀ ⇓ v₀ → e [ ‵val v₀ ]Eₛ ⇓ w₀ → f₀ · e₀ ⇓ w₀
+  ⇓-∙ :  e₀ ⇓ Λ l ⇒ e → e [ T₀ ]ETₛ ⇓ v₀ → e₀ ∙ T₀ ⇓ v₀
 
 -- evaluation API
+
 --! evalBig
-evalBig : Eval
+evalBig : EvalAPI
 evalBig = record
             { _↓_ = _⇓_
-            ; ↓-n = ⇓-n
             ; ↓-s = ⇓-s
-            ; ↓-ƛ = ⇓-ƛ
             ; ↓-· = ⇓-·
-            ; ↓-Λ = ⇓-Λ
             ; ↓-∙ = ⇓-∙
-            ; Value-↓ = Value-⇓
+            ; ↓-v = ⇓-v
             }

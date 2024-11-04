@@ -1,43 +1,47 @@
 module StratF.SmallStepSoundness where
 
-open import Data.List using (List; []; _∷_; [_])
-open import Data.Nat using (ℕ)
+open import Data.Nat.Base using (suc)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; _≢_; refl; sym; trans; cong; cong₂; dcong; dcong₂; subst; subst₂; resp₂; cong-app; icong;
-        subst-∘; subst-subst; subst-sym-subst; sym-cong;
-        module ≡-Reasoning)
-open ≡-Reasoning
+  using (_≡_; refl; sym; trans; cong; cong-app)
 
-open import StratF.ExprSubstFusion public
-open import StratF.ExprSubstPropertiesSem
-open import StratF.ExprSubstitution
+open import StratF.ExpSubstPropertiesSem
+open import StratF.ExpSubstitution
 open import StratF.Expressions
+open import StratF.ExpEnvironments
 open import StratF.SmallStep
 open import StratF.TypeSubstProperties
 open import StratF.TypeSubstPropertiesSem
 open import StratF.TypeSubstitution
 open import StratF.Types
-open import StratF.Util.Extensionality
-open import StratF.Util.HeterogeneousSetOmegaEquality as Hω using (_≅ω_; refl)
-open import StratF.Util.PropositionalSetOmegaEquality
-open import StratF.Util.SubstProperties
-import StratF.Util.HeterogeneousEqualityLemmas as HE
+open import StratF.TypeEnvironments
 
 --! SmallStep >
 
 --! Soundness
-soundness : ∀ {e₁ e₂ : Expr Δ Γ T} →
-  e₁ ↪ e₂ →
-  ∀ η γ → E⟦ e₁ ⟧ η γ ≡ E⟦ e₂ ⟧ η γ
+
+soundness : ∀ {T : Type Δ l} {e₁ e₂ : Exp {Δ} Γ T} → e₁ ↪ e₂ →
+            (γ : VEnv {Δ} Γ η) → ⟦ e₁ ⟧E γ ≡ ⟦ e₂ ⟧E γ
 
 --! SoundnessProofExcerpt
-soundness (ξ-∙ {T′ = T′} {T = T} e₁↪e₂) η γ
-  rewrite Tsingle-subst-preserves η T′ T = cong-app (soundness e₁↪e₂ η γ) (⟦ T′ ⟧ η)
-soundness (β-Λ {T = T} {e = e}) η γ = sym (ETsingle-subst-preserves γ e T)
+
+soundness (β-ƛ {e = e} {v = v}) γ = ⟦ e βƛ ‵val v ⟧E γ
+soundness (β-Λ {T = T} {e = e}) γ = ⟦ e βΛ T ⟧E γ
+soundness {η = η} (ξ-∙ {T′ = T′} {T = T} e↪e′) γ
+  rewrite ⟦ T [ T′ ]Tₛ⟧T η = cong-app (soundness e↪e′ γ) (⟦ T′ ⟧T η)
+
 -- ...
 
-soundness β-suc η γ = refl
-soundness (ξ-suc e₁↪e₂) η γ = cong ℕ.suc (soundness e₁↪e₂ η γ)
-soundness (β-ƛ {e₂ = e₂} {e₁ = e₁} v₂) η γ = sym (EEsingle-subst-preserves γ e₁ e₂)
-soundness (ξ-·₁ {e₂ = e₂} e₁↪e) η γ = cong-app (soundness e₁↪e η γ) (E⟦ e₂ ⟧ η γ)
-soundness (ξ-·₂ {e₁ = e₁} e₂↪e v₁) η γ = cong (E⟦ e₁ ⟧ η γ) (soundness e₂↪e η γ)
+soundness β-s                   γ = refl
+soundness (ξ-s e↪e′)            γ = cong suc (soundness e↪e′ γ)
+soundness (ξ-·ₗ {e = e} f↪f′)   γ = cong-app (soundness f↪f′ γ) (⟦ e ⟧E γ)
+soundness (ξ-·ᵣ {v = v} e↪e′)   γ = cong (⟦ ‵val v ⟧E γ) (soundness e↪e′ γ)
+
+--! MultiStep >
+
+--! Soundness
+
+soundness* : ∀ {T : Type Δ l} {e₁ e₂ : Exp {Δ} Γ T} → e₁ —↠ e₂ →
+            (γ : VEnv {Δ} Γ η) → ⟦ e₁ ⟧E γ ≡ ⟦ e₂ ⟧E γ
+
+soundness* —↠-refl              γ = refl
+soundness* (—↠-step e₁↪e e—↠e₂) γ = trans (soundness e₁↪e γ) (soundness* e—↠e₂ γ)

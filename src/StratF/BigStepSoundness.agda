@@ -1,56 +1,56 @@
--- This file proves that the big step semantics is sound wrt. the denotational semantics.
+-- This file proves that the big-step semantics is sound wrt. the
+-- denotational semantics, going via the small-step soundness proof
 
 module StratF.BigStepSoundness where
 
-open import Data.List using (List; []; _∷_; [_])
-open import Data.Nat using (ℕ; suc)
-open import Function using (id)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; sym; module ≡-Reasoning)
-open ≡-Reasoning
+open import Data.Nat.Base using (suc)
+open import Relation.Binary.PropositionalEquality
+  -- using (_≡_; refl; cong; cong-app; module ≡-Reasoning)
+  using (_≡_)
 
 open import StratF.Evaluation
 open import StratF.BigStep
-open import StratF.ExprSubstPropertiesSem using (EEsingle-subst-preserves; ETsingle-subst-preserves)
-open import StratF.ExprSubstitution
+--open import StratF.SmallStep
+open import StratF.SmallStepSoundness using (soundness*)
+open import StratF.BigEqSmall
+--open import StratF.ExpSubstPropertiesSem
+open import StratF.ExpSubstitution
 open import StratF.Expressions
-open import StratF.TypeSubstProperties
-open import StratF.TypeSubstPropertiesSem
-open import StratF.Types
+open import StratF.ExpEnvironments
 
 --! BigStep >
 
-γ₀ : Env [] ∅ []
-γ₀ = λ l T ()
-
 --! SoundnessType
-soundness : ∀ {T : Type [] l} {e : CExpr T} {v : CValue T} →
-  e ⇓ v → E⟦ e ⟧ [] γ₀ ≡ E⟦ exp v ⟧ [] γ₀
+soundness : e₀ ⇓ v₀ → ⟦ e₀ ⟧E γ₀ ≡ ⟦ v₀ ⟧V γ₀
 
 --! Soundness
-soundness ⇓-n = refl
-soundness (⇓-s e⇓v) = cong suc (soundness e⇓v)
-soundness ⇓-ƛ = refl
-soundness {e = e₁ · e₂}{v = v} (⇓-· {e = e}{v₂ = v₂} e₁⇓v₁ e₂⇓v₂ e[]⇓v) =
+
+soundness e₀⇓v₀ = soundness* (⇓to↓ e₀⇓v₀) γ₀
+
+{- -- redundant! -- -}
+{-
+soundness ⇓-v                        = refl
+soundness (⇓-s e⇓v)                  = cong suc (soundness e⇓v)
+soundness {e₀ = f₀ · e₀} {v₀ = w₀} (⇓-· {e = e} {v₀ = v₀} f₀⇓ƛe e₀⇓v₀ e[v₀]⇓w₀) =
   begin
-    E⟦ e₁ ⟧ [] γ₀ (E⟦ e₂ ⟧ [] γ₀)      ≡⟨ cong (λ H → H (E⟦ e₂ ⟧ [] γ₀)) (soundness e₁⇓v₁) ⟩
-    E⟦ ƛ e ⟧ [] γ₀ (E⟦ e₂ ⟧ [] γ₀)     ≡⟨ cong (E⟦ ƛ e ⟧ [] γ₀) (soundness e₂⇓v₂) ⟩
-    E⟦ ƛ e ⟧ [] γ₀ (E⟦ exp v₂ ⟧ [] γ₀) ≡⟨ sym (EEsingle-subst-preserves γ₀ e (exp v₂)) ⟩
-    E⟦ e [ exp v₂ ]E ⟧ [] γ₀           ≡⟨ soundness e[]⇓v ⟩
-    E⟦ exp v ⟧ [] γ₀
-  ∎
-soundness ⇓-Λ = refl
-soundness {e =  _∙_ {T = T₁} e₁ T}{v = v} (⇓-∙ {e = e} e₁⇓v₁ e[]⇓v) =
+    ⟦ f₀ ⟧E γ₀ (⟦ e₀ ⟧E γ₀)
+  ≡⟨ cong-app (soundness f₀⇓ƛe) (⟦ e₀ ⟧E γ₀) ⟩
+    ⟦ ƛ e ⟧V γ₀ (⟦ e₀ ⟧E γ₀)
+  ≡⟨ cong (⟦ ƛ e ⟧V γ₀) (soundness e₀⇓v₀) ⟩
+    ⟦ ƛ e ⟧V γ₀ (⟦ v₀ ⟧V γ₀)
+  ≡⟨ ⟦ e βƛ ‵val v₀ ⟧E γ₀ ⟩
+    ⟦ e [ ‵val v₀ ]Eₛ ⟧E γ₀
+  ≡⟨ soundness e[v₀]⇓w₀ ⟩
+    ⟦ w₀ ⟧V γ₀
+  ∎ where open ≡-Reasoning
+soundness {e₀ = _∙_ {l = l} e₀ T₀} (⇓-∙ {e = e} {v₀ = v₀} e₀⇓Λe e[T₀]⇓v₀) =
   begin
-    E⟦ e₁ ∙ T ⟧ [] γ₀
-  ≡⟨ refl ⟩
-    subst id (sym (Tsingle-subst-preserves [] T T₁))
-      (E⟦ e₁ ⟧ [] γ₀ (⟦ T ⟧ []))
-  ≡⟨ cong (λ H → subst id (sym (Tsingle-subst-preserves [] T T₁)) (H (⟦ T ⟧ [])))
-          (soundness e₁⇓v₁) ⟩
-    subst id (sym (Tsingle-subst-preserves [] T T₁))
-      (E⟦ e ⟧ (⟦ T ⟧ [] ∷ []) (extend-tskip γ₀))
-  ≡⟨ sym (ETsingle-subst-preserves γ₀ e T) ⟩
-    E⟦ e [ T ]ET ⟧ [] γ₀
-  ≡⟨ soundness e[]⇓v ⟩
-    E⟦ exp v ⟧ [] γ₀
-  ∎
+    ⟦ e₀ ∙ T₀ ⟧E γ₀
+  ≡⟨ soundness* (‵ξ-∙ (⇓to↓ e₀⇓Λe)) γ₀ ⟩
+    ⟦ (‵Λ l ⇒ e) ∙ T₀ ⟧E γ₀
+  ≡⟨ (⟦ e βΛ T₀ ⟧E γ₀) ⟩
+    ⟦ e [ T₀ ]ETₛ ⟧E γ₀
+  ≡⟨ soundness e[T₀]⇓v₀ ⟩
+    ⟦ v₀ ⟧V γ₀
+  ∎ where open ≡-Reasoning
+-}

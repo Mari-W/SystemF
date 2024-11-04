@@ -1,162 +1,85 @@
+{-# OPTIONS --allow-unsolved-metas #-}
 module StratF.Fundamental where
 
-open import Level
+--open import Level
 open import Data.Product using (_×_; Σ; Σ-syntax; ∃-syntax; _,_; proj₁; proj₂)
 open import Data.List using (List; []; _∷_)
-open import Data.Unit.Polymorphic.Base using (⊤; tt)
-open import Data.Nat using (ℕ)
+open import Data.Unit.Base using (⊤; tt)
+open import Data.Nat using (ℕ; suc)
 open import Function using (_∘_; id; case_of_; _|>_)
-open import Relation.Binary.HeterogeneousEquality as H using (_≅_; refl)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; _≢_; refl; sym; trans; cong; cong₂; dcong; subst; subst₂; resp₂; cong-app; icong;
         subst-subst; subst-∘; subst-application; subst-application′; subst-sym-subst; subst-subst-sym; -- Properties
         module ≡-Reasoning)
 open ≡-Reasoning
 
-open import StratF.Evaluation
+open import StratF.LogicalRelation
 open import StratF.BigStep
-open import StratF.ExprSubstProperties
-open import StratF.ExprSubstitution
+open import StratF.Evaluation
+open import StratF.ExpSubstPropertiesSem
+open import StratF.ExpSubstProperties
+open import StratF.ExpSubstitution
 open import StratF.Expressions
-open import StratF.LRVren
-open import StratF.LRVsub
-open import StratF.Logical
-open import StratF.LogicalPrelim
+open import StratF.ExpEnvironments
 open import StratF.TypeSubstProperties
 open import StratF.TypeSubstPropertiesSem
 open import StratF.TypeSubstitution
 open import StratF.Types
+open import StratF.TypeEnvironments
 open import StratF.Util.Extensionality
-open import StratF.Util.HeterogeneousEqualityLemmas hiding (module R)
-open import StratF.Util.PropositionalSetOmegaEquality
-open import StratF.Util.SubstProperties
 
---! Fundamental >
-
-Tsub-act-Text :
-  ∀ (ρ : 𝓓⟦ Δ ⟧)
-  → (T′ : Type Δ l)
-  → let ρ* = π₁ ρ in
-    (l₂ : Level)
-  → (x : l₂ ∈ (l ∷ Δ))
-  → REext ρ (Tsub ρ* T′ ,
-            subst (λ ⟦T⟧ → CValue (Tsub ρ* T′) → ⟦T⟧ → Set l)
-                  (sym (subst-preserves ρ* T′))
-                  (𝓥⟦ T′ ⟧ ρ)) l₂ x
-  ≡ Tsub-act (Textₛ Tidₛ T′) ρ l₂ x
-Tsub-act-Text ρ T′ l₂ here = refl
-Tsub-act-Text ρ T′ l₂ (there x) =
-  let ρ* = π₁ ρ in
-  begin
-    REext ρ
-      (Tsub (π₁ ρ) T′ ,
-       subst (λ ⟦T⟧ → CValue (Tsub (π₁ ρ) T′) → ⟦T⟧ → Set _)
-       (sym (subst-preserves (π₁ ρ) T′))
-       (𝓥⟦ T′ ⟧ ρ))
-      l₂ (there x)
-  ≡⟨ refl ⟩
-    ρ l₂ x
-  ≡⟨ refl ⟩
-    proj₁ (ρ l₂ x) , proj₂ (ρ l₂ x)
-  ≡⟨ cong (proj₁ (ρ l₂ x) ,_)
-    (fun-ext₂ (λ z z₁ →
-      cong (proj₂ (ρ l₂ x) z)
-        (sym (subst-subst-sym {P = id} (subst-var-preserves x ρ* []))))) ⟩
-    proj₁ (ρ l₂ x) ,
-      (λ z z₁ →
-         proj₂ (ρ l₂ x) z
-         (subst id (subst-var-preserves x ρ* [])
-          (subst id (sym (subst-var-preserves x ρ* [])) z₁)))
-  ≡⟨ cong (proj₁ (ρ l₂ x) ,_)
-    (fun-ext (λ v →
-      app-subst (λ z →
-            proj₂ (ρ l₂ x) v (subst id (subst-var-preserves x ρ* []) z))
-            (subst-var-preserves x ρ* []))) ⟩
-    proj₁ (ρ l₂ x) ,
-      (λ v →
-         subst (λ Z → Z → Set l₂) (subst-var-preserves x ρ* [])
-         (λ z →
-            proj₂ (ρ l₂ x) v (subst id (subst-var-preserves x ρ* []) z)))
-  ≡⟨ sym (cong (proj₁(ρ l₂ x) ,_)
-         (eta-subst (λ v z → proj₂ (ρ _ x) v (subst id (subst-var-preserves x ρ* []) z))
-                    (subst-var-preserves x ρ* []) )) ⟩
-    proj₁(ρ l₂ x) ,
-    subst (λ ⟦x⟧ → (CValue (ρ* l₂ x) → ⟦x⟧ → Set _))
-          (subst-var-preserves x ρ* [])
-          (λ v z → proj₂ (ρ _ x) v (subst id (subst-var-preserves x ρ* []) z))
-  ≡⟨ cong (π₁ ρ l₂ x ,_)
-    (cong₂ (subst (λ ⟦x⟧ → CValue (ρ* l₂ x) → ⟦x⟧ → Set _))
-      (sym (sym-sym (subst-var-preserves x ρ* [])) ) refl) ⟩
-    ρ* l₂ x ,
-    subst (λ ⟦x⟧ → (CValue (Tsub ρ* (` x)) → ⟦x⟧ → Set _))
-          (sym (subst-preserves ρ* (` x)))
-          (𝓥⟦ (` x) ⟧ ρ)
-  ≡⟨ refl ⟩
-    Tsub-act (Textₛ Tidₛ T′) ρ l₂ (there x)
-  ∎
-
-Elift-[]≡Cextt : (Γ : Ctx Δ) (ρ : 𝓓⟦ Δ ⟧) (χ : CSub (π₁ ρ) Γ) (l′ l : Level) (T : Type (l ∷ Δ) l′) (e : Expr (l ∷ Δ) (l ◁* Γ) T) (T′ : Type [] l) (R : REL T′)
-  → let σ = π₁ ρ in
-    let lhs = (Esub (Tliftₛ σ l) (Eliftₛ-l σ (ς₁ χ)) e [ T′ ]ET) in
-    let rhs = Csub (subst (λ σ → CSub σ (l ◁* Γ)) (sym (subst←RE-ext-ext ρ T′ R)) (Cextt χ T′)) e in
-    subst (Expr [] ∅) (lemma1 ρ T T′ R) lhs ≡ rhs
-Elift-[]≡Cextt Γ ρ χ l′ l T e T′ R =
-  let τ* = π₁ ρ in
-  let σ = ς₁ χ in
-  begin
-    subst CExpr (lemma1 ρ T T′ R)
-      (Esub (Tliftₛ τ* l) (Eliftₛ-l τ* σ) e [ T′ ]ET)  -- : Expr [] ∅ (Tsub (Tliftₛ τ* l) T [ T′ ]T)
-  ≡⟨ cong (subst CExpr (lemma1 ρ T T′ R))
-          ( Elift-l-[]≡Eext _ _ T′ T τ* σ e) ⟩
-    subst CExpr (lemma1 ρ T T′ R)
-      (subst CExpr (sym (σ↑T[T′]≡TextₛσT′T τ* T′ T))
-       (Esub (Textₛ τ* T′) (Eextₛ-l τ* σ) e))
-  ≡⟨  subst-subst {P = CExpr} (sym (σ↑T[T′]≡TextₛσT′T τ* T′ T)) {(lemma1 ρ T T′ R)} {(Esub (Textₛ τ* T′) (Eextₛ-l τ* σ) e)}  ⟩
-    subst CExpr
-      (trans (sym (σ↑T[T′]≡TextₛσT′T τ* T′ T)) (lemma1 ρ T T′ R))
-      (Esub (Textₛ τ* T′) (Eextₛ-l τ* σ) e)
-  ≡⟨ subst-irrelevant {F = CExpr}
-                        (trans (sym (σ↑T[T′]≡TextₛσT′T τ* T′ T)) (lemma1 ρ T T′ R))
-                        (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R)))
-                        (Esub (Textₛ τ* T′) (Eextₛ-l τ* σ) e) ⟩
-    subst CExpr (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R)))
-      (Esub (Textₛ τ* T′) (Eextₛ-l τ* σ) e)   -- : Expr [] ∅ (Tsub (Textₛ τ* T′) T)
-  ≡⟨ cong (λ σ → subst CExpr
-      (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R)))
-      (Esub (Textₛ (π₁ ρ) T′) σ e))
-      (sym (Cextt-Eextₛ-l {T′ = T′} χ)) ⟩
-    subst CExpr (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R)))
-    (Esub (Textₛ (π₁ ρ) T′) (ς₁ (Cextt χ T′)) e)
-  ≡⟨ refl ⟩
-    subst CExpr (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R))) (Csub (Cextt χ T′) e)
-  ≡˘⟨ dist-subst' {F = (λ τ* → CSub τ* (l ◁* Γ))} {G = CExpr} (λ τ* → Tsub τ* T) (λ χ → Csub χ e) (sym (subst←RE-ext-ext ρ T′ R)) (cong (λ τ* → Tsub τ* T) (sym (subst←RE-ext-ext ρ T′ R))) (Cextt χ T′) ⟩
-    Csub
-      (subst (λ τ* → CSub τ* (l ◁* Γ)) (sym (subst←RE-ext-ext ρ T′ R))
-       (Cextt χ T′))
-      e
-  ∎
 
 -- semantic soundness
 
 --! SemanticSoundness {
-semantic-soundness : 
-  ∀ (Γ : Ctx Δ) (T : Type Δ l) (e : Expr Δ Γ T) → Setω
-semantic-soundness {Δ = Δ} Γ T e = (ρ : 𝓓⟦ Δ ⟧) → 
-  let ρ* = π₁ ρ ; η = ⟦ ρ* ⟧* [] in
-  (χ : CSub ρ* Γ) (γ : Env Δ Γ η) →
-  𝓖⟦ Γ ⟧ ρ χ γ → 𝓔⟦ T ⟧ ρ (Csub χ e) (E⟦ e ⟧ η γ)
+Soundness : (e : Exp {Δ} Γ {l} T) → Set (E-level e)
+Soundness {Δ = Δ} {Γ = Γ} {T = T} e = ∀ (δ : ⟦ Δ ⟧𝓓) →
+  let τ* = 𝓓Tsub δ; η = ⟦ η₀ ⟧TETₛ τ*  in
+  (χ : VSub (⟦ Γ ⟧EEₛ τ*) Γ₀) (γ : ⟦ Γ ⟧EE η) →
 
-syntax semantic-soundness Γ T e = Γ ⊨ e ⦂ T
+  ⟦ Γ ⟧𝓖 δ χ γ  → 𝓔⟦ T ⟧ δ (Esub* τ* (VS⇒ES χ) e) (⟦ e ⟧E γ)
+
 --! }
 
 -- fundamental theorem
 
---! FundamentalType
-fundamental :  ∀ (Γ : Ctx Δ) (T : Type Δ l) (e : Expr Δ Γ T) → 
-               Γ ⊨ e ⦂ T
+--! AdequacyType
+Adequacy : (e : Exp₀ ‵ℕ) (n : ℕ) → Set
+Adequacy e n = n ≡ ⟦ e ⟧E γ₀ → e ⇓ # n
 
+--! AdequacyBody
+
+adequacy : (e₀ : Exp₀ ‵ℕ) (n₀ : ℕ) → Adequacy e₀ n₀
+
+--! FundamentalType
+soundnessV :  (v : Val {Δ} Γ {l} T) → Soundness (‵val v)
+soundnessE :  (e : Exp {Δ} Γ {l} T) → Soundness e
+
+adequacy e₀ n₀ refl
+  with v₀@(# .n₀) , δ₀*χ₀*e₀⇓#n₀ , refl ← soundnessE e₀ δ₀ χ₀ γ₀ 𝓖₀ = e₀⇓v₀
+  where
+  -- δ₀*χ₀*e₀⇓#n : Esub* (𝓓Tsub δ₀) (ς χ₀) e₀ ⇓ v₀
+  e₀⇓v₀ : e₀ ⇓ v₀
+  e₀⇓v₀ rewrite lemmaδ₀ rewrite lemmaχ₀ rewrite ⟦ e₀ ⟧Esub*TidₛEidₛ≗idE
+    = {!lemmaδ₀!} -- δ₀*χ₀*e₀⇓#n₀, still modulo ⟦ e₀ ⟧ETₛ Tidₛ ≡ e₀
+
+
+soundnessV {Δ = Δ} {Γ = Γ} {T = T}        (‵ x)     δ χ γ 𝓖⟦Γ⟧ = _ , ⇓-v , {!!}
+soundnessV {Δ = Δ} {Γ = Γ} {T = ‵ℕ}       (# n)     δ χ γ 𝓖⟦Γ⟧ = # n , ⇓-v , refl
+soundnessV {Δ = Δ} {Γ = Γ} {T = T₁ ‵⇒ T₂} (ƛ e)     δ χ γ 𝓖⟦Γ⟧ =
+  ƛ Esub* (𝓓Tsub δ) (Eliftₛ (VS⇒ES χ)) e , ⇓-v ,
+   λ v₀ w v₀[T₁]w → {!!} , {!!} , {!!}
+soundnessV {Δ = Δ} {Γ = Γ} {T = ‵∀[ T ]}  (Λ l ⇒ e) δ χ γ 𝓖⟦Γ⟧ = {!!}
+
+soundnessE {Δ = Δ} {Γ = Γ} {T = T} (‵val v)            = soundnessV v
+soundnessE {Δ = Δ} {Γ = Γ} {T = T} (‵suc e) δ χ γ 𝓖⟦Γ⟧
+  with # n , e⇓#n , eq ←  soundnessE e δ χ γ 𝓖⟦Γ⟧ = # suc n , ⇓-s e⇓#n , cong suc eq
+soundnessE {Δ = Δ} {Γ = Γ} {T = T} (f · e)  δ χ γ 𝓖⟦Γ⟧ = {!!}
+soundnessE {Δ = Δ} {Γ = Γ} {T = _`} (e ∙ T′) δ χ γ 𝓖⟦Γ⟧ = {!!}
+
+{-
 --! FundamentalConstant
-fundamental Γ .`ℕ (# n) ρ χ γ 𝓖⟦Γ⟧ = 
+fundamental Γ .`ℕ (# n) ρ χ γ 𝓖⟦Γ⟧ =
   (# n , V-♯) , ⇓-n , (n , (refl , refl))
 
 --! FundamentalSuccessor
@@ -179,10 +102,10 @@ fundamental Γ (T₁ ⇒ T₂) (ƛ e) ρ χ γ 𝓖⟦Γ⟧ =
         eqω₁     :  γ ≡ω Gdrop {T = T₁} (extend γ z)
         eqω₁     =  Gdrop-extend {T = T₁} γ z
         𝓖⟦T₁◁Γ⟧  =  (𝓥⟦T₁⟧wz , substlω (𝓖⟦ Γ ⟧ ρ) eq₁ eqω₁ 𝓖⟦Γ⟧)
-        eq₂      :  Csub (Cextend χ w) e ≡ 
+        eq₂      :  Csub (Cextend χ w) e ≡
                     Esub (π₁ ρ) (Eliftₛ (π₁ ρ) (ς₁ χ)) e [ exp w ]E
         eq₂      =  Cextend-Elift χ w e
-        (v , ew⇓v , 𝓥⟦T₂⟧vy) = fundamental (T₁ ◁ Γ) T₂ e ρ 
+        (v , ew⇓v , 𝓥⟦T₂⟧vy) = fundamental (T₁ ◁ Γ) T₂ e ρ
           (Cextend χ w) (extend γ z) 𝓖⟦T₁◁Γ⟧
     in v , subst (_⇓ v) eq₂ ew⇓v , 𝓥⟦T₂⟧vy)
 
@@ -216,7 +139,7 @@ fundamental Γ (`∀α .l , T) (Λ l ⇒ e) ρ χ γ 𝓖⟦Γ⟧ =
         (extend-tskip γ)
         lrg′
     |> λ where
-      (v , e⇓v , lrv-t) → 
+      (v , e⇓v , lrv-t) →
         let v′ = subst CValue (sym (lemma1 ρ T T′ R)) v in
         let e⇓v = subst₂ _⇓_ (sym (Elift-[]≡Cextt Γ ρ χ _ l T e T′ R)) refl e⇓v in
         let sub-lrvt = subst₂ (𝓥⟦ T ⟧ (REext ρ (T′ , R))) (sym (subst-subst-sym (lemma1 ρ T T′ R))) refl in
@@ -225,7 +148,7 @@ fundamental Γ (`∀α .l , T) (Λ l ⇒ e) ρ χ γ 𝓖⟦Γ⟧ =
         let 𝕖 = Esub (Textₛ Tidₛ T′) (Eextₛ-l Tidₛ Eidₛ) (Esub (Tliftₛ σ* l) (Eliftₛ-l σ* σ) e) in
         let eq = lemma1 ρ T T′ R in
            v′ ,
-           subst id (begin 
+           subst id (begin
               subst CExpr eq 𝕖 ⇓ v
             ≡⟨ subst-swap′′ CExpr CValue _⇓_ 𝕖 v (sym eq) eq ⟩
               𝕖 ⇓ subst CValue (sym eq) v
@@ -235,21 +158,21 @@ fundamental Γ (`∀α .l , T) (Λ l ⇒ e) ρ χ γ 𝓖⟦Γ⟧ =
 fundamental Γ .(T [ T′ ]T) (_∙_ {l = l}{T = T} e  T′) ρ χ γ lrg
   with fundamental Γ (`∀α l , T) e ρ χ γ lrg
 ... | v@ (_ , V-Λ) , e⇓v , e′ , refl , lrv
-  with lrv (Tsub (π₁ ρ) T′) 
-           (subst (λ ⟦T⟧ → CValue (Tsub (π₁ ρ) T′) → ⟦T⟧ → Set l) 
+  with lrv (Tsub (π₁ ρ) T′)
+           (subst (λ ⟦T⟧ → CValue (Tsub (π₁ ρ) T′) → ⟦T⟧ → Set l)
                   (sym (subst-preserves (π₁ ρ) T′))
-                  (𝓥⟦ T′ ⟧ ρ)) 
-... | v₂ , vT′⇓v₂ , lrv₂  = 
+                  (𝓥⟦ T′ ⟧ ρ))
+... | v₂ , vT′⇓v₂ , lrv₂  =
   let ρ* = π₁ ρ in
   let σ = ς₁ χ in
   let η = ⟦ ρ* ⟧* [] in
   let eq₁ = sym (swap-Tsub-[] (π₁ ρ) T T′)  in
   let e•T⇓v = ⇓-∙ e⇓v vT′⇓v₂ in
   subst CValue eq₁ v₂ ,
-  subst id (begin 
+  subst id (begin
       Esub ρ* σ e ∙ Tsub ρ* T′ ⇓ v₂
     ≡⟨ subst-elim′′′′ (Expr [] ∅) CValue _⇓_ (Esub ρ* σ e ∙ Tsub ρ* T′) v₂ eq₁ ⟩
-      subst (Expr [] ∅) eq₁ (Esub ρ* σ e ∙ Tsub ρ* T′) ⇓ subst CValue eq₁ v₂ 
+      subst (Expr [] ∅) eq₁ (Esub ρ* σ e ∙ Tsub ρ* T′) ⇓ subst CValue eq₁ v₂
     ∎) e•T⇓v ,
     let
       eq-sub =
@@ -583,7 +506,7 @@ Csub-closed' {T = T} χ e =
 Csub-closed : ∀ (χ : CSub (π₁ ρ₀) ∅) (e : CExpr T) →
   Csub χ e ≡ subst CExpr Tsub-closed e
 
-Csub-closed χ e = 
+Csub-closed χ e =
   H.≅-to-≡ (
     R.begin
       Csub χ e
@@ -604,4 +527,4 @@ adequacy e n ⟦e⟧≡n with fundamental ∅ `ℕ e ρ₀ χ₀ γ₀ tt
   subst₂ _⇓_ (Csub-closed χ₀ e)
              (cong (λ n → (# n) , V-♯) ⟦e⟧≡n) e⇓v
 
- 
+-}

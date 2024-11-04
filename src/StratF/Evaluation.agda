@@ -1,53 +1,41 @@
 module StratF.Evaluation where
 
-open import Data.List using (List; []; _∷_; [_])
-open import Data.Nat using (ℕ; suc)
+open import Level using (Level)
+open import Data.Nat.Base using (suc)
 
-open import StratF.ExprSubstitution
+open import StratF.ExpSubstitution
 open import StratF.Expressions
+open import StratF.ExpEnvironments
 open import StratF.Types
+open import StratF.TypeEnvironments
 
 --! BigStep >
 
 -- big step call by value semantics (analogous to Benton et al)
 
---! CExpr
-CExpr : Type [] l → Set
-CExpr T = Expr [] ∅ T
+Type₀ : Level → Set
+Type₀ = Type Δ₀
 
---! isValue
-data isValue : Expr Δ Γ T → Set where
-  V-♯  : isValue {Δ} {Γ} (# n)
-  V-ƛ  : isValue (ƛ e)
-  V-Λ  : isValue (Λ l ⇒ e)
+variable T₀ : Type₀ l
 
+⟦_⟧T₀ : (T : Type₀ l) → Set l
+⟦ T₀ ⟧T₀ = ⟦ T₀ ⟧T η₀
 
---! Value
-record CValue (T : Type [] l) : Set where
-  constructor _,_
-  field  exp : CExpr T
-         prf : isValue exp
+--! Val₀ Exp₀
+Val₀ Exp₀ : Type₀ l → Set
+Val₀ T = Val Γ₀ T
+Exp₀ T = Exp Γ₀ T
 
-open CValue public
+variable
+  v₀ w₀ : Val₀ T₀
+  e₀ f₀ : Exp₀ T₀
 
--- general evaluation API
-
-variable v v₂ : CValue T
-
-
-record Eval : Set₁ where
-  infix 15 _↓_ 
+record EvalAPI : Set₁ where
+  infix 15 _↓_
   field
-    _↓_ : ∀ {T : Type [] l} → CExpr T → CValue T → Set
-    ↓-n : (# n) ↓ ((# n) , V-♯)
-    ↓-s : e ↓ ((# n) , V-♯) → `suc e ↓ ((# suc n) , V-♯)
-    ↓-ƛ : (ƛ e) ↓ ((ƛ e) , V-ƛ)
-    ↓-· : e₁ ↓ ((ƛ e) , V-ƛ) → e₂ ↓ v₂ → (e [ exp v₂ ]E) ↓ v → (e₁ · e₂) ↓ v
-    ↓-Λ : (Λ l ⇒ e) ↓ ((Λ l ⇒ e) , V-Λ)
-    ↓-∙ : e₁ ↓ ((Λ l ⇒ e) , V-Λ) → (e [ T ]ET) ↓ v → (e₁ ∙ T) ↓ v
-    Value-↓ : ∀ {T : Type [] l} → (v : CValue T) → exp v ↓ v
+    _↓_ : Exp₀ T₀ → Val₀ T₀ → Set
+    ↓-s : e₀ ↓ # n → ‵suc e₀ ↓ # suc n
+    ↓-· : f₀ ↓ ƛ e → e₀ ↓ v₀ → e [ ‵val v₀ ]Eₛ ↓ w₀ → f₀ · e₀ ↓ w₀
+    ↓-∙ : {e : Exp [ l ] T} → e₀ ↓ Λ l ⇒ e → e [ T₀ ]ETₛ ↓ v₀ → e₀ ∙[ T ] T₀ ↓ v₀
+    ↓-v : ‵val v₀ ↓ v₀
 
-
--- compatibility
-
-Value = CValue

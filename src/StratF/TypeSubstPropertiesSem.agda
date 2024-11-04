@@ -5,142 +5,124 @@ module StratF.TypeSubstPropertiesSem where
 
 open import Level
 open import Data.List using (List; []; _∷_)
+open import Data.Product.Base using (_,_; proj₂)
+open import Function.Base using (_∘_; _$_; flip)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; subst₂; resp₂; cong-app; icong; module ≡-Reasoning)
+  using (_≡_; _≢_; refl; sym; trans; cong; cong₂; subst; module ≡-Reasoning)
 open ≡-Reasoning
 
+open import StratF.TypeEnvironments
 open import StratF.Types
 open import StratF.TypeSubstitution
 open import StratF.TypeSubstProperties
 open import StratF.Util.Extensionality
-open import StratF.Util.PropositionalSetOmegaEquality
 
 private variable
-  ρ ρ₁ ρ₂ ρ′ : TSub Δ₁ Δ₂
+  ρ ρ₁ ρ₂ ρ′ : TRen Δ₁ Δ₂
   σ σ₁ σ₂ σ′ : TSub Δ₁ Δ₂
 
 --! TF >
 
--- the action of renaming on semantic environments
+-- the (functorial!) action of type renaming on semantic type environments
 
-TRen* : (ρ* : TRen Δ₁ Δ₂) → (η₁ : Env* Δ₁) → (η₂ : Env* Δ₂) → Setω
-TRen* {Δ₁} ρ* η₁ η₂ = ∀ {l : Level} → (x : l ∈ Δ₁) → apply-env η₂ (ρ* _ x) ≡ apply-env η₁ x
+-- MW: this differs to our approach in the paper.
+-- instead of relating two environments using equalities between its contents under a renaming (TRen*),
+-- we apply the renaming to the semantic environment similar to what we do in the paper for substiution.
+-- note to myself: i do the same thing in my latest implementation that uses REWRITE: 
+-- https://github.com/Mari-W/IntrinsicTypes/blob/ba6d74ef3cd8170aec528dc4aa47d4b574e5d04c/Rewrite/SystemF.agda#L482C1-L482C2
+⟦_⟧TETᵣ_ : (η : ⟦ Δ₂ ⟧TE) (ρ : TRen Δ₁ Δ₂) → ⟦ Δ₁ ⟧TE
+⟦ η ⟧TETᵣ ρ = ⟦ ⟦ η ⟧TE⇒TEω ∘ tren ρ ⟧TEω⇒TE
 
-wkᵣ∈Ren* : ∀ (η : Env* Δ) (⟦α⟧ : Set l) → TRen* (Twkᵣ {Δ₁ = Δ}{l = l} Tidᵣ) η (⟦α⟧ ∷ η)
-wkᵣ∈Ren* η ⟦α⟧ x = refl
+TRen* : (ρ : TRen Δ₁ Δ₂) (η : ⟦ Δ₂ ⟧TE) → ⟦ Δ₁ ⟧TE
+TRen* ρ η = ⟦ η ⟧TETᵣ ρ
 
-Tren*-id : (η : Env* Δ) → TRen* Tidᵣ η η
-Tren*-id η x = refl
+-- for which the following equational properties are provable
 
-Tren*-pop : (ρ* : TRen (l ∷ Δ₁) Δ₂) (α : Set l) (η₁ : Env* Δ₁) (η₂ : Env* Δ₂) → 
-  TRen* ρ* (α ∷ η₁) η₂ → TRen* (λ _ x → ρ* _ (there x)) η₁ η₂
-Tren*-pop ρ* α η₁ η₂ Tren* x = Tren* (there x)
+wkᵣ∈Ren* : (η : ⟦ Δ ⟧TE) (⟦α⟧ : Set l) → ⟦ ⟦α⟧ ∷η η ⟧TETᵣ Tskipᵣ ≡ η
+wkᵣ∈Ren* η ⟦α⟧ = ⟦ η ⟧TE⇒TEω∘TEω⇒TE≗id
 
-Tren*-lift : ∀ {ρ* : TRen Δ₁ Δ₂}{η₁ : Env* Δ₁}{η₂ : Env* Δ₂} (α : Set l)
-  → TRen* ρ* η₁ η₂ → TRen* (Tliftᵣ ρ* _) (α ∷ η₁) (α ∷ η₂)
-Tren*-lift α Tren* here = refl
-Tren*-lift α Tren* (there x) = Tren* x
+Tren*-id : (η : ⟦ Δ ⟧TE) → ⟦ η ⟧TETᵣ Tidᵣ ≡ η
+Tren*-id η = ⟦ η ⟧TE⇒TEω∘TEω⇒TE≗id
+
+Tren*-pop : (ρ : TRen (l ∷ Δ₁) Δ₂) (η : ⟦ Δ₂ ⟧TE) →
+            ⟦ η ⟧TETᵣ Tpopᵣ ρ ≡ proj₂ (⟦ η ⟧TETᵣ ρ)
+Tren*-pop ρ η = ⟦ (λ _ → refl) ⟧TEω⇒TE-ext
+
+Tren*-lift : ∀ {ρ : TRen Δ₁ Δ₂} {η : ⟦ Δ₂ ⟧TE} (⟦α⟧ : Set l) →
+             ⟦ ⟦α⟧ ∷η η ⟧TETᵣ Tliftᵣ ρ ≡ ⟦α⟧ ∷η ⟦ η ⟧TETᵣ ρ
+Tren*-lift _ = refl
 
 --! RenPreservesSemanticsType
-Tren*-preserves-semantics : (Tren* : TRen* ρ* η₁ η₂) →
-  (T : Type Δ₁ l) → ⟦ Tren ρ* T ⟧ η₂ ≡ ⟦ T ⟧ η₁
+Tren*-preserves-⟦‵_⟧T : {ρ : TRen Δ₁ Δ₂} {η : ⟦ Δ₂ ⟧TE} (α : l ∈ᵗ Δ₁) →
+                        ⟦‵ tren ρ α ⟧T η ≡ ⟦‵ α ⟧T ⟦ η ⟧TETᵣ ρ
+Tren*-preserves-⟦‵ α ⟧T = sym (⟦ α ⟧TEω⇒TE∘TE⇒TEω≗id)
 
-Tren*-preserves-semantics {ρ* = ρ*} {η₁} {η₂} Tren* (` x) = Tren* x
-Tren*-preserves-semantics {ρ* = ρ*} {η₁} {η₂} Tren* (T₁ ⇒ T₂) = cong₂ (λ A₁ A₂ → A₁ → A₂) (Tren*-preserves-semantics {ρ* = ρ*} {η₁} {η₂} Tren* T₁) (Tren*-preserves-semantics {ρ* = ρ*} {η₁} {η₂} Tren* T₂)
-Tren*-preserves-semantics {ρ* = ρ*} {η₁} {η₂} Tren* (`∀α l , T) = dep-ext λ where 
-  α → Tren*-preserves-semantics{ρ* = Tliftᵣ ρ* _}{α ∷ η₁}{α ∷ η₂} (Tren*-lift {ρ* = ρ*} α Tren*) T
-Tren*-preserves-semantics Tren* `ℕ = refl
+Tren*-preserves-⟦_⟧T : {ρ : TRen Δ₁ Δ₂} {η : ⟦ Δ₂ ⟧TE} (T : Type Δ₁ l) →
+                          ⟦ ⟦ T ⟧Tᵣ ρ ⟧T η ≡ ⟦ T ⟧T ⟦ η ⟧TETᵣ ρ
+Tren*-preserves-⟦ ‵ℕ      ⟧T  = refl
+Tren*-preserves-⟦ ‵ α     ⟧T  = sym (⟦ α ⟧TEω⇒TE∘TE⇒TEω≗id)
+Tren*-preserves-⟦ T₁ ‵⇒ T₂ ⟧T = cong₂ _⟦⇒⟧_ (Tren*-preserves-⟦ T₁ ⟧T) (Tren*-preserves-⟦ T₂ ⟧T)
+Tren*-preserves-⟦ ‵∀[ T ] ⟧T  = dep-ext λ ⟦α⟧ → Tren*-preserves-⟦ T ⟧T
 
--- special case of composition sub o ren
+Tpop-σ≡Twk∘σ : (σ* : TSub (l ∷ Δ₁) Δ₂) → Tpopₛ σ* ≡ Tskipᵣ ∘ᵣₛ σ*
+Tpop-σ≡Twk∘σ σ* = cong mkTSub $ fun-ext₂ λ _ → refl
 
-sublemma-ext : (σ : TSub Δ []) → ∀ l x → (Textₛ σ T) l x ≡ (Tliftₛ σ _ ∘ₛₛ Textₛ Tidₛ T) l x
-sublemma-ext σ l here = refl
-sublemma-ext{T = T} σ l (there x) =
-  trans (sym (TidₛT≡T (σ l x)))
-        (sym (fusion-Tsub-Tren (σ _ x) (Twkᵣ Tidᵣ) (Textₛ Tidₛ T)))
+⟦Twk_⟧T_  : (T : Type Δ l) (⟦α⟧ : Set l′) {η : ⟦ Δ ⟧TE} →
+            ⟦ Twk T ⟧T (⟦α⟧ ∷η η) ≡ ⟦ T ⟧T η
+⟦Twk_⟧T_ T ⟦α⟧ {η = η} = begin
+  ⟦ Twk T ⟧T (⟦α⟧ ∷η η)            ≡⟨ Tren*-preserves-⟦ T ⟧T ⟩
+  ⟦ T ⟧T (TRen* Tskipᵣ (⟦α⟧ ∷η η)) ≡⟨ cong ⟦ T ⟧T_ ⟦ η ⟧TE⇒TEω∘TEω⇒TE≗id ⟩
+  ⟦ T ⟧T η                         ∎
 
-sublemma : (σ : TSub Δ []) → (Textₛ σ T) ≡ Tliftₛ σ _ ∘ₛₛ Textₛ Tidₛ T
-sublemma {T = T} σ = fun-ext₂ (sublemma-ext σ)
+-- the functorial action of substitution on semantic environments
 
-lemma2 : (σ : TSub Δ []) → (T  : Type (l ∷ Δ) l′) → (T′ : Type [] l)
-  → Tsub (Tliftₛ σ l) T [ T′ ]T ≡ Tsub (Textₛ σ T′) T
-lemma2 σ T T′ = begin 
-    Tsub (Textₛ Tidₛ T′) (Tsub (Tliftₛ σ _) T)
-  ≡⟨ fusion-Tsub-Tsub T (Tliftₛ σ _) (Textₛ Tidₛ T′) ⟩
-    Tsub (Tliftₛ σ _ ∘ₛₛ Textₛ Tidₛ T′) T
-  ≡⟨ cong (λ σ → Tsub σ T) (sym (sublemma σ)) ⟩
-    Tsub (Textₛ σ T′) T
-  ∎
-
-Tdrop-σ≡Twk∘σ : ∀ (σ* : TSub (l ∷ Δ₁) Δ₂) → Tdropₛ σ* ≡ Twkᵣ Tidᵣ ∘ᵣₛ σ*
-Tdrop-σ≡Twk∘σ σ* = fun-ext₂ (λ x y → refl)
-
--- the action of substitution on semantic environments
+-- MW: analogously to renamings (and like we did it in the paper)
 
 --! substToEnv
-⟦_⟧* : TSub Δ₁ Δ₂ → Env* Δ₂ → Env* Δ₁
-⟦_⟧* {Δ₁ = []}     σ* η₂ = []
-⟦_⟧* {Δ₁ = _ ∷ _}  σ* η₂ = ⟦ σ* _ here ⟧ η₂ ∷ ⟦ Tdropₛ σ* ⟧* η₂
+⟦_⟧TETₛ_ : ⟦ Δ₂ ⟧TE → TSub Δ₁ Δ₂ → ⟦ Δ₁ ⟧TE
+⟦ η ⟧TETₛ σ = ⟦ ⟦_⟧T η ∘ tsub σ ⟧TEω⇒TE
 
-subst-to-env* : TSub Δ₁ Δ₂ → Env* Δ₂ → Env* Δ₁
-subst-to-env* = ⟦_⟧*
+subst-to-env* : TSub Δ₁ Δ₂ → ⟦ Δ₂ ⟧TE → ⟦ Δ₁ ⟧TE
+subst-to-env* = flip ⟦_⟧TETₛ_
 
 --! substVarPreservesType
-subst-var-preserves : (α : l ∈ Δ₁) (τ* : TSub Δ₁ Δ₂) 
-  (η₂ : Env* Δ₂) → lookup α (⟦ τ* ⟧* η₂) ≡ ⟦ τ* l α ⟧ η₂
+subst-var-preserves : (σ : TSub Δ₁ Δ₂) (η : ⟦ Δ₂ ⟧TE) (α : l ∈ᵗ Δ₁) →
+                      ⟦‵ α ⟧T (⟦ η ⟧TETₛ σ) ≡ ⟦ tsub σ α ⟧T η
+subst-var-preserves _ _ α = ⟦ α ⟧TEω⇒TE∘TE⇒TEω≗id
 
-subst-var-preserves here σ* η₂ = refl
-subst-var-preserves (there x) σ* η₂ = subst-var-preserves x (Tdropₛ σ*) η₂
+apply-env-var : ∀ (σ₀ : TSub Δ []) (α : l ∈ᵗ Δ) →
+                ⟦‵ α ⟧T (⟦ η₀ ⟧TETₛ σ₀) ≡ ⟦ tsub σ₀ α ⟧T η₀
+apply-env-var σ₀ = subst-var-preserves σ₀ η₀
 
-subst-to-env*-wk : (σ*  : TSub Δ₁ Δ₂) → (α  : Set l) → (η₂ : Env* Δ₂) → 
-  subst-to-env* (Twkₛ σ*) (α ∷ η₂) ≡ω subst-to-env* σ* η₂
-subst-to-env*-wk {Δ₁ = []} σ* α η₂ = refl
-subst-to-env*-wk {Δ₁ = l ∷ Δ₁} σ* α η₂ = transω (conglω (_∷ subst-to-env* (Tdropₛ (Twkₛ σ*)) (α ∷ η₂)) (Tren*-preserves-semantics {ρ* = Twkᵣ Tidᵣ}{η₂}{α ∷ η₂} (wkᵣ∈Ren* η₂ α) (σ* _ here)))
-                                               (congωω (⟦ (σ* _ here) ⟧ η₂ ∷_) (subst-to-env*-wk (Tdropₛ σ*) α η₂))
+τ*∈Ren* : (ρ : TRen Δ₁ Δ₂) (σ₀ : TSub Δ₂ []) →
+          ⟦ ⟦ η₀ ⟧TETₛ σ₀ ⟧TETᵣ ρ ≡ ⟦ η₀ ⟧TETₛ (ρ ∘ᵣₛ σ₀)
+τ*∈Ren* ρ σ₀ = ⟦ subst-var-preserves σ₀ η₀ ∘ tren ρ ⟧TEω⇒TE-ext
 
-subst-to-env*-build : ∀ (ρ* : TRen Δ₁ Δ₂) (η₁ : Env* Δ₁) (η₂ : Env* Δ₂) → TRen* ρ* η₁ η₂
-  → subst-to-env* (λ _ x → ` ρ* _ x) η₂ ≡ω η₁
-subst-to-env*-build ρ* [] η₂ Tren* = refl
-subst-to-env*-build {Δ₁ = _ ∷ Δ₁} ρ* (α ∷ η₁) η₂ Tren* = 
-  transω (congωω (λ H → apply-env η₂ (ρ* _ here) ∷ H) (subst-to-env*-build (λ _ x → ρ* _ (there x)) η₁ η₂ (Tren*-pop ρ* α η₁ η₂ Tren*)))
-         (conglω (_∷ η₁) (Tren* here))
+subst-to-env*-wk : (σ : TSub Δ₁ Δ₂) (⟦α⟧ : Set l) {η : ⟦ Δ₂ ⟧TE} →
+                   ⟦ ⟦α⟧ ∷η η ⟧TETₛ Twkₛ σ ≡ ⟦ η ⟧TETₛ σ
+subst-to-env*-wk σ ⟦α⟧ = ⟦ ⟦Twk_⟧T ⟦α⟧ ∘ tsub σ ⟧TEω⇒TE-ext
 
-subst-to-env*-id : (η : Env* Δ) → subst-to-env* Tidₛ η ≡ω η
-subst-to-env*-id {Δ = Δ} η = subst-to-env*-build {Δ₁ = Δ} (λ _ x → x) η η (Tren*-id η)
+subst-to-env*-id : (η : ⟦ Δ ⟧TE) → subst-to-env* Tidₛ η ≡ η
+subst-to-env*-id η = Tren*-id η
 
-subst-preserves-type : Setω
-subst-preserves-type =
-  ∀ {Δ₁ Δ₂}{l}{η₂ : Env* Δ₂}
-  → (σ* : TSub Δ₁ Δ₂) (T : Type Δ₁ l)
-  → ⟦ Tsub σ* T ⟧ η₂ ≡ ⟦ T ⟧ (subst-to-env* σ* η₂)
+subst-preserves : (σ : TSub Δ₁ Δ₂) (T : Type Δ₁ l) →
+                  ⟦ ⟦ T ⟧Tₛ σ ⟧T η ≡ ⟦ T ⟧T ⟦ η ⟧TETₛ σ
+subst-preserves σ ‵ℕ         = refl
+subst-preserves σ (‵ α)      = sym (subst-var-preserves σ _ α)
+subst-preserves σ (T₁ ‵⇒ T₂) = cong₂ _⟦⇒⟧_ (subst-preserves σ T₁) (subst-preserves σ T₂)
+subst-preserves σ ‵∀[ T ]    = dep-ext λ ⟦α⟧ → begin
+  ⟦ Tsub (Tliftₛ σ) T ⟧T (⟦α⟧ ∷η _) ≡⟨ subst-preserves (Tliftₛ σ) T ⟩
+  ⟦ T ⟧T ⟦ ⟦α⟧ ∷η _ ⟧TETₛ Tliftₛ σ  ≡⟨ cong (⟦ T ⟧T_ ∘ (⟦α⟧ ∷η_)) (subst-to-env*-wk σ ⟦α⟧) ⟩
+  ⟦ T ⟧T (⟦α⟧ ∷η (⟦ _ ⟧TETₛ σ))     ∎
 
-subst-preserves : subst-preserves-type
-subst-preserves {η₂ = η₂} σ* (` x) =
-  sym (subst-var-preserves x σ* η₂)
-subst-preserves {η₂ = η₂} σ* (T₁ ⇒ T₂) =
-  cong₂ (λ A B → A → B) (subst-preserves{η₂ = η₂} σ* T₁) (subst-preserves{η₂ = η₂} σ* T₂)
-subst-preserves {η₂ = η₂} σ* (`∀α l , T) =
-  dep-ext (λ ⟦α⟧ →
-    trans (subst-preserves {η₂ = ⟦α⟧ ∷ η₂} (Tliftₛ σ* _) T)
-          (congωl (λ H → ⟦ T ⟧ (⟦α⟧ ∷ H)) (subst-to-env*-wk σ* ⟦α⟧ η₂)))
-subst-preserves σ* `ℕ = refl
- 
+subst-to-env*-comp : (σ : TSub Δ₁ Δ₂) (τ : TSub Δ₂ Δ₃) {η : ⟦ Δ₃ ⟧TE} →
+                     ⟦ ⟦ η ⟧TETₛ τ ⟧TETₛ σ ≡ ⟦ η ⟧TETₛ (σ ∘ₛₛ τ)
+subst-to-env*-comp σ τ = ⟦ sym ∘ subst-preserves τ ∘ tsub σ ⟧TEω⇒TE-ext
+
 --! SingleSubstPreserves
-Tsingle-subst-preserves : ∀ (η : Env* Δ) (T′ : Type Δ l) 
-  (T : Type (l ∷ Δ) l′) → ⟦ T [ T′ ]T ⟧ η ≡ ⟦ T ⟧ (⟦ T′ ⟧ η ∷ η)
+⟦_[_]Tₛ⟧T_ : (T : Type (l ∷ Δ) l′) (T′ : Type Δ l) (η : ⟦ Δ ⟧TE) →
+             ⟦ T [ T′ ]Tₛ ⟧T η ≡ ⟦ T ⟧T (⟦ T′ ⟧T η ∷η η)
 
-Tsingle-subst-preserves {Δ = Δ} {l = l}{l′ = l′} η T′ T =
-  trans (subst-preserves (Textₛ Tidₛ T′) T)
-        (congωl (λ H → ⟦ T ⟧ (⟦ T′ ⟧ η ∷ H)) (subst-to-env*-id η))
-
-subst-to-env*-comp : (σ* : TSub Δ₁ Δ₂) → (τ* : TSub Δ₂ Δ₃) → (η : Env* Δ₃) → subst-to-env* σ* (subst-to-env* τ* η) ≡ω subst-to-env* (σ* ∘ₛₛ τ*) η
-subst-to-env*-comp {Δ₁ = []} σ* τ* η = refl
-subst-to-env*-comp {Δ₁ = l ∷ Δ₁} σ* τ* η = conglωω _∷_ (sym (subst-preserves τ* (σ* l here))) (subst-to-env*-comp (Tdropₛ σ*) τ* η)
-
-apply-env-var : (σ* : TSub Δ []) (x : l ∈ Δ) → apply-env (subst-to-env* σ* []) x ≡ ⟦ σ* l x ⟧ []
-apply-env-var σ* here = refl
-apply-env-var σ* (there x) = apply-env-var (Tdropₛ σ*) x
-
-τ*∈Ren* : (τ* : TRen Δ₁ Δ₂) (σ* : TSub Δ₂ []) → TRen* τ* (subst-to-env* (τ* ∘ᵣₛ σ*) []) (subst-to-env* σ* [])
-τ*∈Ren* τ* σ* here = apply-env-var σ* (τ* _ here)
-τ*∈Ren* τ* σ* (there x) = τ*∈Ren* (Tdropᵣ τ*) σ* x
+⟦ T [ T′ ]Tₛ⟧T η = trans
+  (subst-preserves [ T′ ]T T)
+  (cong (⟦ T ⟧T_ ∘ (⟦ T′ ⟧T η ∷η_)) ⟦ η ⟧TE⇒TEω∘TEω⇒TE≗id)
